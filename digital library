@@ -1,0 +1,270 @@
+1)
+  import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+
+@Entity
+public class Book {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String title;
+    private String author;
+    private String category;
+    private boolean isIssued;
+
+    // Getters and Setters
+}
+2)import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+
+@Entity
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+    private String email;
+
+    // Getters and Setters
+}
+3)
+  import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface LibraryRepository extends JpaRepository<Book, Long> {
+    List<Book> findByCategory(String category);
+    List<Book> findByTitleContaining(String title);
+}
+4)
+  import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class LibraryService {
+    @Autowired
+    private LibraryRepository libraryRepository;
+
+    public List<Book> getAllBooks() {
+        return libraryRepository.findAll();
+    }
+
+    public List<Book> getBooksByCategory(String category) {
+        return libraryRepository.findByCategory(category);
+    }
+
+    public List<Book> searchBooks(String keyword) {
+        return libraryRepository.findByTitleContaining(keyword);
+    }
+
+    public void addBook(Book book) {
+        libraryRepository.save(book);
+    }
+
+    public void deleteBook(Long id) {
+        libraryRepository.deleteById(id);
+    }
+
+    public void updateBook(Book book) {
+        libraryRepository.save(book);
+    }
+
+    public Book getBookById(Long id) {
+        return libraryRepository.findById(id).orElse(null);
+    }
+}
+5)import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/admin")
+public class AdminController {
+    @Autowired
+    private LibraryService libraryService;
+
+    @GetMapping("/books")
+    public String listBooks(Model model) {
+        model.addAttribute("books", libraryService.getAllBooks());
+        return "admin/book_list";
+    }
+
+    @GetMapping("/books/add")
+    public String addBookForm(Model model) {
+        model.addAttribute("book", new Book());
+        return "admin/add_book";
+    }
+
+    @PostMapping("/books/add")
+    public String addBook(@ModelAttribute Book book) {
+        libraryService.addBook(book);
+        return "redirect:/admin/books";
+    }
+
+    @GetMapping("/books/edit/{id}")
+    public String editBookForm(@PathVariable Long id, Model model) {
+        model.addAttribute("book", libraryService.getBookById(id));
+        return "admin/edit_book";
+    }
+
+    @PostMapping("/books/edit")
+    public String editBook(@ModelAttribute Book book) {
+        libraryService.updateBook(book);
+        return "redirect:/admin/books";
+    }
+
+    @GetMapping("/books/delete/{id}")
+    public String deleteBook(@PathVariable Long id) {
+        libraryService.deleteBook(id);
+        return "redirect:/admin/books";
+    }
+}
+6)
+  import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/user")
+public class UserController {
+    @Autowired
+    private LibraryService libraryService;
+
+    @GetMapping("/books")
+    public String listBooks(Model model) {
+        model.addAttribute("books", libraryService.getAllBooks());
+        return "user/book_list";
+    }
+
+    @GetMapping("/books/category/{category}")
+    public String listBooksByCategory(@PathVariable String category, Model model) {
+        model.addAttribute("books", libraryService.getBooksByCategory(category));
+        return "user/book_list";
+    }
+
+    @GetMapping("/books/search")
+    public String searchBooks(@RequestParam String keyword, Model model) {
+        model.addAttribute("books", libraryService.searchBooks(keyword));
+        return "user/book_list";
+    }
+
+    @GetMapping("/books/issue/{id}")
+    public String issueBook(@PathVariable Long id) {
+        Book book = libraryService.getBookById(id);
+        book.setIssued(true);
+        libraryService.updateBook(book);
+        return "redirect:/user/books";
+    }
+
+    @GetMapping("/books/return/{id}")
+    public String returnBook(@PathVariable Long id) {
+        Book book = libraryService.getBookById(id);
+        book.setIssued(false);
+        libraryService.updateBook(book);
+        return "redirect:/user/books";
+    }
+}
+7)<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Admin Dashboard</title>
+</head>
+<body>
+    <h1>Admin Dashboard</h1>
+    <a href="/admin/books">Manage Books</a>
+</body>
+</html>
+8)
+  <!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>User Dashboard</title>
+</head>
+<body>
+    <h1>User Dashboard</h1>
+    <a href="/user/books">View Books</a>
+</body>
+</html>
+9)<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Book List</title>
+</head>
+<body>
+    <h1>Book List</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Category</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="book : ${books}">
+                <td th:text="${book.title}"></td>
+                <td th:text="${book.author}"></td>
+                <td th:text="${book.category}"></td>
+                <td>
+                    <a th:href="@{'/admin/books/edit/' + ${book.id}}">Edit</a>
+                    <a th:href="@{'/admin/books/delete/' + ${book.id}}">Delete</a>
+                    <a th:href="@{'/user/books/issue/' + ${book.id}}" th:if="${!book.issued}">Issue</a>
+                    <a th:href="@{'/user/books/return/' + ${book.id}}" th:if="${book.issued}">Return</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
+10)
+                      <!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Issue Book</title>
+</head>
+<body>
+    <h1>Issue Book</h1>
+    <form th:action="@{/user/books/issue}" method="post">
+        <input type="hidden" th:field="*{id}">
+        <div>
+            <label>Title:</label>
+            <input type="text" th:field="*{title}" readonly>
+        </div>
+        <div>
+            <label>Author:</label>
+            <input type="text" th:field="*{author}" readonly>
+        </div>
+        <div>
+            <label>Category:</label>
+            <input type="text" th:field="*{category}" readonly>
+        </div>
+        <button type="submit">Issue</button>
+    </form>
+</body>
+</html>
+11)CREATE DATABASE examdb;
+
+USE examdb;
+
+CREATE TABLE users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE books (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    author VARCHAR(255) NOT NULL,
+    category VARCHAR(255) NOT NULL,
+    is_issued BOOLEAN DEFAULT FALSE
+);
+12)
+  spring.datasource.url=jdbc:mysql://localhost:3306
